@@ -62,3 +62,17 @@ If you use the code provided in this repository, please cite the following paper
 
 
 Thank you for your cooperation in acknowledging the original work.
+
+
+## Simple PyTorch Version
+A simplified and readable PyTorch implementation is provided in `vae_cnn_pytorch_simple.py`.
+
+Run:
+
+```bash
+python vae_cnn_pytorch_simple.py
+```
+
+Notes:
+- The script mirrors the original logic: encoder + VAE decoder + S11 predictor.
+- It uses `fre_train.npy` (same filename used by the original TensorFlow script).
