@@ -13,8 +13,10 @@ This keeps the original model logic, but uses modern and clean PyTorch code.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Tuple
 
+import matplotlib.pyplot as plt
 import numpy as np
 import torch
 import torch.nn as nn
@@ -40,6 +42,7 @@ class Config:
     epochs: int = 200
     lr: float = 1e-3
     s11_loss_weight: float = 5.0
+    loss_curve_path: str = "training_loss_curve.png"
 
     device: str = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -208,6 +211,8 @@ def train(cfg: Config) -> None:
     print(f"Device: {cfg.device}")
     print(f"Samples: {len(dataset)}")
 
+    history = {"total": [], "recon": [], "kl": [], "s11": []}
+
     model.train()
     for epoch in range(1, cfg.epochs + 1):
         running = {"recon": 0.0, "kl": 0.0, "s11": 0.0, "total": 0.0}
@@ -229,10 +234,14 @@ def train(cfg: Config) -> None:
 
         n_batches = len(loader)
         avg = {k: v / n_batches for k, v in running.items()}
+        for k in history:
+            history[k].append(avg[k])
         print(
             f"Epoch {epoch:04d}/{cfg.epochs} | "
             f"total={avg['total']:.6f} recon={avg['recon']:.6f} kl={avg['kl']:.6f} s11={avg['s11']:.6f}"
         )
+
+    save_loss_curve(history, cfg.loss_curve_path)
 
     # Save weights (similar to original script behavior).
     torch.save(model.encoder.state_dict(), "encoder_weights.pt")
@@ -240,6 +249,36 @@ def train(cfg: Config) -> None:
     torch.save(model.decoder.state_dict(), "decoder_weights.pt")
     torch.save(model.state_dict(), "vae_with_predictor_weights.pt")
     print("Saved weights: encoder/predictor/decoder/full model")
+
+
+def save_loss_curve(history: dict, output_path: str) -> None:
+    epochs = np.arange(1, len(history["total"]) + 1)
+    fig, axes = plt.subplots(2, 2, figsize=(12, 8), sharex=True)
+    axes = axes.flatten()
+
+    losses = [
+        ("total", "Total Loss"),
+        ("recon", "Reconstruction Loss"),
+        ("kl", "KL Loss"),
+        ("s11", "S11 MSE Loss"),
+    ]
+
+    for ax, (key, title) in zip(axes, losses):
+        ax.plot(epochs, history[key], color="tab:blue")
+        ax.set_title(title)
+        ax.set_ylabel("Loss")
+        ax.grid(True, alpha=0.3)
+
+    axes[2].set_xlabel("Epoch")
+    axes[3].set_xlabel("Epoch")
+    fig.suptitle("Training Loss Curves (Separated by Type)", fontsize=14)
+    fig.tight_layout(rect=[0, 0, 1, 0.96])
+
+    output = Path(output_path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(output, dpi=150)
+    plt.close(fig)
+    print(f"Saved loss curve: {output.resolve()}")
 
 
 if __name__ == "__main__":
